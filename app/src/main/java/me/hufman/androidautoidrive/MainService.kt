@@ -1,10 +1,9 @@
 package me.hufman.androidautoidrive
 
-import android.app.Notification
+import android.app.*
 import android.app.Notification.PRIORITY_LOW
-import android.app.PendingIntent
-import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
@@ -22,6 +21,9 @@ class MainService: Service() {
 		const val ACTION_STOP = "me.hufman.androidautoidrive.MainService.stop"
 	}
 	val ONGOING_NOTIFICATION_ID = 20503
+	val NOTIFICATION_CHANNEL_ID = "ConnectionNotification"
+	val NOTIFICATION_CHANNEL_NAME = "Car Connection Status"
+
 	var foregroundNotification: Notification? = null
 
 	val idriveConnectionListener = IDriveConnectionListener()   // start listening to car connection, if the AndroidManifest listener didn't start
@@ -69,6 +71,8 @@ class MainService: Service() {
 	 */
 	private fun handleActionStart() {
 		Log.i(TAG, "Starting up service")
+		createNotificationChannel()
+		// try connecting to the security service
 		if (!securityServiceThread.isAlive) {
 			securityServiceThread.start()
 		}
@@ -90,6 +94,17 @@ class MainService: Service() {
 		}
 	}
 
+	private fun createNotificationChannel() {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID,
+					NOTIFICATION_CHANNEL_NAME,
+					NotificationManager.IMPORTANCE_MIN)
+
+			val notificationManager = getSystemService(NotificationManager::class.java)
+			notificationManager.createNotificationChannel(channel)
+		}
+	}
+
 	private fun startServiceNotification(brand: String?) {
 		Log.i(TAG, "Creating foreground notification")
 		val notifyIntent = Intent(this, MainActivity::class.java).apply {
@@ -102,6 +117,10 @@ class MainService: Service() {
 				.setSmallIcon(android.R.drawable.ic_menu_gallery)
 				.setPriority(PRIORITY_LOW)
 				.setContentIntent(PendingIntent.getActivity(this, 0, notifyIntent, PendingIntent.FLAG_UPDATE_CURRENT))
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			foregroundNotificationBuilder.setChannelId(NOTIFICATION_CHANNEL_ID)
+		}
+
 		if (brand?.toLowerCase() == "bmw") foregroundNotificationBuilder.setContentText(getText(R.string.notification_description_bmw))
 		if (brand?.toLowerCase() == "mini") foregroundNotificationBuilder.setContentText(getText(R.string.notification_description_mini))
 		foregroundNotification = foregroundNotificationBuilder.build()
